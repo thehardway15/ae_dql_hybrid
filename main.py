@@ -2,15 +2,10 @@ import ale_py
 import numpy as np
 import gymnasium as gym
 import tensorflow as tf
-from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.layers import Dense, Conv2D, Flatten
-from tensorflow.keras.optimizers import RMSprop
-from tensorflow.keras.callbacks import TensorBoard
 import random
 from collections import deque
 import matplotlib.pyplot as plt
 import pandas as pd
-import time
 from datetime import datetime
 from tqdm import tqdm
 
@@ -45,15 +40,15 @@ def preprocess_frame(frame):
 # Build the Q-Network
 def build_q_network(input_shape, action_space):
     inputs = tf.keras.Input(shape=input_shape)
-    x = Conv2D(32, (8, 8), strides=4, activation='relu')(inputs)
-    x = Conv2D(64, (4, 4), strides=2, activation='relu')(x)
-    x = Conv2D(64, (3, 3), strides=1, activation='relu')(x)
-    x = Flatten()(x)
-    x = Dense(512, activation='relu')(x)
-    outputs = Dense(action_space, activation='linear')(x)
+    x = tf.keras.layers.Conv2D(32, (8, 8), strides=4, activation='relu')(inputs)
+    x = tf.keras.layers.Conv2D(64, (4, 4), strides=2, activation='relu')(x)
+    x = tf.keras.layers.Conv2D(64, (3, 3), strides=1, activation='relu')(x)
+    x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.Dense(512, activation='relu')(x)
+    outputs = tf.keras.layers.Dense(action_space, activation='linear')(x)
     
     model = tf.keras.Model(inputs=inputs, outputs=outputs)
-    optimizer = RMSprop(learning_rate=LEARNING_RATE, rho=0.95, epsilon=0.01)
+    optimizer = tf.keras.optimizers.RMSprop(learning_rate=LEARNING_RATE, rho=0.95, epsilon=0.01)
     model.compile(optimizer=optimizer, loss='mse')
     return model
 
@@ -70,7 +65,7 @@ class DQNAgent:
         self.update_counter = 0
         
         # TensorBoard setup
-        self.tensorboard = TensorBoard(log_dir=LOG_DIR)
+        self.tensorboard = tf.keras.callbacks.TensorBoard(log_dir=LOG_DIR)
         self.tensorboard.set_model(self.q_network)
         self.train_summary_writer = tf.summary.create_file_writer(LOG_DIR)
         self.episode_reward = 0
@@ -251,7 +246,7 @@ def evaluate_agent(agent, env, episodes=EVAL_EPISODES):
 
 def play_final_agent(model_path, env_name=ENV_NAME, episodes=1):
     env = gym.make(env_name, render_mode="human")
-    model = load_model(model_path)
+    model = tf.keras.models.load_model(model_path)
     for episode in range(episodes):
         state, _ = env.reset()
         state = preprocess_frame(state)  # Shape: (84, 84)
