@@ -141,7 +141,7 @@ def train(args):
     
     # Parametry treningu
     num_frames = args.num_frames
-    batch_size = 32
+    batch_size = args.batch_size
     gamma = 0.99
     epsilon_start = 1.0
     epsilon_final = 0.1
@@ -260,6 +260,7 @@ def main():
     parser.add_argument("--env_name", type=str, default="PongNoFrameskip-v4", help="Nazwa środowiska Atari")
     parser.add_argument("--num_frames", type=int, default=1000000, help="Liczba klatek treningowych")
     parser.add_argument("--replay_buffer_capacity", type=int, default=100000, help="Liczba klatek treningowych")
+    parser.add_argument("--batch_size", type=int, default=32, help="Rozmiar partii")
     parser.add_argument("--save_path", type=str, default="dqn_model.pt", help="Ścieżka zapisu/ładowania modelu")
     parser.add_argument("--num_episodes", type=int, default=10, help="Liczba epizodów do renderingu")
     
