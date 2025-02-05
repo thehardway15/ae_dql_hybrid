@@ -222,7 +222,7 @@ def render(args):
     env_name = args.env_name
     # Tworzymy środowisko z render_mode ustawionym na "human"
     env = gym.make(env_name, render_mode="human")
-    env = gym.wrappers.AtariPreprocessing(env, grayscale_obs=True, scale_obs=False, frame_skip=4)
+    env = gym.wrappers.AtariPreprocessing(env, grayscale_obs=True, scale_obs=False, frame_skip=4, terminal_on_life_loss=True)
     env = gym.wrappers.FrameStackObservation(env, stack_size=4)
     
     device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
