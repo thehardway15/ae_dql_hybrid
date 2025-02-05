@@ -113,6 +113,9 @@ def train(args):
     env = gym.wrappers.FrameStackObservation(env, stack_size=4)
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+    if device == "cuda":
+        torch.backends.cudnn.benchmark = True
     
     # Upewnij się, że kształt obserwacji to krotka zwykłych int
     input_shape = tuple(map(int, env.observation_space.shape))
@@ -175,7 +178,7 @@ def train(args):
         
         if done:
             state, _ = env.reset()
-            all_rewards.append(episode_reward)
+            # all_rewards.append(episode_reward)
             progress_bar.set_postfix({'episode': episode, 'reward': f'{episode_reward:.2f}', 'epsilon': f'{epsilon:.3f}'})
             episode_reward = 0
             episode += 1
@@ -186,7 +189,7 @@ def train(args):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            losses.append(loss.item())
+            # losses.append(loss.item())
         
         if frame_idx % target_update_frequency == 0:
             target_model.load_state_dict(current_model.state_dict())
@@ -196,18 +199,18 @@ def train(args):
     env.close()
     
     # Wyświetlenie statystyk – średnia nagroda z ostatnich 10 epizodów
-    if all_rewards:
-        mean_reward = np.mean(all_rewards[-10:])
-        print(f"Średnia nagroda z ostatnich 10 epizodów: {mean_reward:.2f}")
+    # if all_rewards:
+    #     mean_reward = np.mean(all_rewards[-10:])
+    #     print(f"Średnia nagroda z ostatnich 10 epizodów: {mean_reward:.2f}")
     
     # Zapis modelu
     torch.jit.save(current_model, args.save_path)
     print(f"Model zapisany do: {args.save_path}")
     
     # Zapisujemy wyniki do plików (opcjonalnie)
-    np.save("episode_rewards.npy", np.array(all_rewards))
-    np.save("losses.npy", np.array(losses))
-    print("Wyniki treningu zapisane do plików: episode_rewards.npy oraz losses.npy")
+    # np.save("episode_rewards.npy", np.array(all_rewards))
+    # np.save("losses.npy", np.array(losses))
+    # print("Wyniki treningu zapisane do plików: episode_rewards.npy oraz losses.npy")
     
     return all_rewards, losses
 
