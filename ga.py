@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import random
 from tqdm import tqdm
+from atari_wrapper import make_atari, wrap_deepmind
 
 gym.register_envs(ale_py)
 # ====================================================
@@ -38,9 +39,11 @@ class DQN(nn.Module):
         )
 
     def forward(self, x):
-        x = x / 255.0  # normalizacja pikseli
+        x = x / 255.0  # Normalizacja pikseli
+        # Permute the dimensions from (B, H, W, C) to (B, C, H, W)
+        x = x.permute(0, 3, 1, 2).contiguous()
         conv_out = self.conv(x)
-        conv_out = conv_out.view(x.size(0), -1)
+        conv_out = conv_out.view(conv_out.size(0), -1)
         return self.fc(conv_out)
 
 # ====================================================
@@ -87,9 +90,8 @@ def evaluate(model, env, device, episodes=1, render=False):
 # ====================================================
 def train_ga(args):
     # Tworzymy środowisko i ustawiamy wrappery Atari
-    env = gym.make(args.env_name)
-    env = gym.wrappers.AtariPreprocessing(env, grayscale_obs=True, scale_obs=False, frame_skip=4, terminal_on_life_loss=True)
-    env = gym.wrappers.FrameStackObservation(env, stack_size=4)
+    env = make_atari(args.env_name, max_episode_steps=18000)
+    env = wrap_deepmind(env, episode_life=True, clip_rewards=True, frame_stack=True, scale=False)
 
     device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
     print(f"Using device: {device}")
@@ -166,8 +168,7 @@ def train_ga(args):
 # ====================================================
 def render_model(args):
     env = gym.make(args.env_name, render_mode="human")
-    env = gym.wrappers.AtariPreprocessing(env, grayscale_obs=True, scale_obs=False, frame_skip=4)
-    env = gym.wrappers.FrameStack(env, num_stack=4)
+    env = wrap_deepmind(env, episode_life=False, clip_rewards=False, frame_stack=True, scale=False)
 
     device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
     print(f"Using device: {device}")

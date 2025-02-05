@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
+from atari_wrapper import wrap_deepmind, make_atari
 
 gym.register_envs(ale_py)
 
@@ -60,8 +61,10 @@ class DQN(nn.Module):
     
     def forward(self, x):
         x = x / 255.0  # Normalizacja pikseli
+        # Permute the dimensions from (B, H, W, C) to (B, C, H, W)
+        x = x.permute(0, 3, 1, 2).contiguous()
         conv_out = self.conv(x)
-        conv_out = conv_out.view(x.size()[0], -1)
+        conv_out = conv_out.view(conv_out.size(0), -1)
         return self.fc(conv_out)
 
 # ===========================================
@@ -103,15 +106,17 @@ def compute_loss(batch, current_model, target_model, device, gamma):
 # ===========================================
 def train(args):
     env_name = args.env_name
-    env = gym.make(env_name)
+    num_frames = args.num_frames
+    batch_size = args.batch_size
     
     # Wrappery Atari:
     # - AtariPreprocessing: konwertuje obraz do skali szarości, resize do 84x84, stosuje frame skip
     #   oraz no-op reset (domyślnie noop_max=30)
     # - FrameStack: stackuje kolejne 4 klatki
-    env = gym.wrappers.AtariPreprocessing(env, grayscale_obs=True, scale_obs=False, frame_skip=4)
-    env = gym.wrappers.FrameStackObservation(env, stack_size=4)
-    
+    # env = gym.wrappers.AtariPreprocessing(env, grayscale_obs=True, scale_obs=False, frame_skip=4)
+    # env = gym.wrappers.FrameStackObservation(env, stack_size=4)
+    env = make_atari(env_name, max_episode_steps=18000)
+    env = wrap_deepmind(env, frame_stack=True)
     device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
     print(f"Using device: {device}")
     if device == "cuda":
@@ -140,8 +145,6 @@ def train(args):
     replay_buffer = ReplayBuffer(capacity=replay_buffer_capacity)
     
     # Parametry treningu
-    num_frames = args.num_frames
-    batch_size = args.batch_size
     gamma = 0.99
     epsilon_start = 1.0
     epsilon_final = 0.1
@@ -149,7 +152,6 @@ def train(args):
     target_update_frequency = 10000
     learning_starts = 50000
     update_frequency = 4
-    clip_rewards = True  # opcjonalny reward clipping do -1, 0, 1
     
     # Do zbierania wyników
     all_rewards = []
@@ -170,9 +172,6 @@ def train(args):
         next_state, reward, terminated, truncated, _ = env.step(action)
         done = terminated or truncated
 
-        if clip_rewards:
-            reward = np.sign(reward)
-        
         replay_buffer.push(np.array(state), action, reward, np.array(next_state), done)
         state = next_state
         episode_reward += reward
@@ -222,8 +221,9 @@ def render(args):
     env_name = args.env_name
     # Tworzymy środowisko z render_mode ustawionym na "human"
     env = gym.make(env_name, render_mode="human")
-    env = gym.wrappers.AtariPreprocessing(env, grayscale_obs=True, scale_obs=False, frame_skip=4, terminal_on_life_loss=True)
-    env = gym.wrappers.FrameStackObservation(env, stack_size=4)
+    # env = gym.wrappers.AtariPreprocessing(env, grayscale_obs=True, scale_obs=False, frame_skip=4, terminal_on_life_loss=True)
+    # env = gym.wrappers.FrameStackObservation(env, stack_size=4)
+    env = wrap_deepmind(env, frame_stack=True, episode_life=False, clip_rewards=False)
     
     device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
     print(f"Using device: {device}")
