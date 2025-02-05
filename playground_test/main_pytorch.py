@@ -291,6 +291,6 @@ def play():
     env.close()
 
 if __name__ == "__main__":
-    train()
+    # train()
     # Uncomment to watch the trained model play
-    # play()
+    play()

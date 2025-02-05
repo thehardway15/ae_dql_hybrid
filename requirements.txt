@@ -1,11 +1,7 @@
-tensorflow==2.14.0
-numpy==1.26
-gymnasium[atari,accept-rom-license,classic-control]==1.0.0
+gymnasium[atari,accept-rom-license,classic-control,other]
 ale-py
 pandas
 matplotlib
 tqdm
-tensorboard==2.14.0
-tensorflow-metal==1.1.0
 torch
 torchvision
