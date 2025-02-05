@@ -81,6 +81,8 @@ def evaluate(model, env, device, episodes=1, render=False):
             state, reward, terminated, truncated, _ = env.step(action)
             total_reward += reward
             done = terminated or truncated
+            if total_reward < -2:
+                done = True
             if render:
                 env.render()
     return total_reward / episodes
@@ -125,11 +127,15 @@ def train_ga(args):
     progress_bar = tqdm(total=num_generations, desc='Training Progress')
     for gen in range(num_generations):
         rewards = []
+        progress_bar_inner = tqdm(total=population_size, desc='Evaluating Population')
         for individual in population:
             set_flat_params_to(model, individual)
             # Ewaluujemy pojedynczy epizod; można zwiększyć liczbę epizodów dla stabilniejszego oszacowania fitness
             reward = evaluate(model, env, device, episodes=1)
             rewards.append(reward)
+            progress_bar_inner.set_postfix({'reward': f'{reward:.2f}'})
+            progress_bar_inner.update(1)
+        progress_bar_inner.close()
 
         # Sortujemy populację według fitness (malejąco)
         sorted_indices = np.argsort(rewards)[::-1]

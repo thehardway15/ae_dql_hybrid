@@ -175,6 +175,9 @@ def train(args):
         replay_buffer.push(np.array(state), action, reward, np.array(next_state), done)
         state = next_state
         episode_reward += reward
+
+        if episode_reward < -2:
+            done = True
         
         if done:
             state, _ = env.reset()
