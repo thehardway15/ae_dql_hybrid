@@ -112,7 +112,7 @@ def train(args):
     env = gym.wrappers.AtariPreprocessing(env, grayscale_obs=True, scale_obs=False, frame_skip=4)
     env = gym.wrappers.FrameStackObservation(env, stack_size=4)
     
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
     print(f"Using device: {device}")
     if device == "cuda":
         torch.backends.cudnn.benchmark = True
