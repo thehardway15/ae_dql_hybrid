@@ -122,6 +122,7 @@ def train(args):
     if len(input_shape) == 3 and input_shape[2] == 4:
         input_shape = (4, input_shape[0], input_shape[1])
     num_actions = int(env.action_space.n)
+    replay_buffer_capacity = args.replay_buffer_capacity
     
     # Inicjalizacja sieci
     current_model = DQN(input_shape, num_actions).to(device)
@@ -136,7 +137,7 @@ def train(args):
     # optimizer = optim.RMSprop(current_model.parameters(), lr=0.00025, alpha=0.95, eps=0.01)
     optimizer = optim.Adam(current_model.parameters(), lr=0.00025)
     
-    replay_buffer = ReplayBuffer(capacity=1000000)
+    replay_buffer = ReplayBuffer(capacity=replay_buffer_capacity)
     
     # Parametry treningu
     num_frames = args.num_frames
@@ -224,7 +225,10 @@ def render(args):
     env = gym.wrappers.AtariPreprocessing(env, grayscale_obs=True, scale_obs=False, frame_skip=4)
     env = gym.wrappers.FrameStackObservation(env, stack_size=4)
     
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if torch.cuda.is_available() else "cpu"))
+    print(f"Using device: {device}")
+    if device == "cuda":
+        torch.backends.cudnn.benchmark = True
     
     # Ładujemy zapisany model
     model = torch.jit.load(args.save_path, map_location=device)
@@ -255,6 +259,7 @@ def main():
     parser.add_argument("--mode", choices=["train", "render"], default="train", help="Wybierz tryb: train lub render")
     parser.add_argument("--env_name", type=str, default="PongNoFrameskip-v4", help="Nazwa środowiska Atari")
     parser.add_argument("--num_frames", type=int, default=1000000, help="Liczba klatek treningowych")
+    parser.add_argument("--replay_buffer_capacity", type=int, default=100000, help="Liczba klatek treningowych")
     parser.add_argument("--save_path", type=str, default="dqn_model.pt", help="Ścieżka zapisu/ładowania modelu")
     parser.add_argument("--num_episodes", type=int, default=10, help="Liczba epizodów do renderingu")
     
