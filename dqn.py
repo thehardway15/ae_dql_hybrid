@@ -148,9 +148,9 @@ def train(args):
     gamma = 0.99
     epsilon_start = 1.0
     epsilon_final = 0.1
-    epsilon_decay = num_frames  # liniowa dekrementacja epsilon przez cały trening
+    epsilon_decay = num_frames * 0.02  # liniowa dekrementacja epsilon 
     target_update_frequency = 10000
-    learning_starts = 50000
+    learning_starts = num_frames * 0.001
     update_frequency = 4
     
     # Do zbierania wyników
@@ -172,16 +172,16 @@ def train(args):
         next_state, reward, terminated, truncated, _ = env.step(action)
         done = terminated or truncated
 
-        replay_buffer.push(np.array(state), action, reward, np.array(next_state), done)
         state = next_state
         episode_reward += reward
-
         if episode_reward < -2:
             done = True
-        
+
+        replay_buffer.push(np.array(state), action, reward, np.array(next_state), done)
+                
         if done:
             state, _ = env.reset()
-            # all_rewards.append(episode_reward)
+            all_rewards.append(episode_reward)
             progress_bar.set_postfix({'episode': episode, 'reward': f'{episode_reward:.2f}', 'epsilon': f'{epsilon:.3f}'})
             episode_reward = 0
             episode += 1
@@ -192,7 +192,7 @@ def train(args):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            # losses.append(loss.item())
+            losses.append(loss.item())
         
         if frame_idx % target_update_frequency == 0:
             target_model.load_state_dict(current_model.state_dict())
@@ -202,18 +202,18 @@ def train(args):
     env.close()
     
     # Wyświetlenie statystyk – średnia nagroda z ostatnich 10 epizodów
-    # if all_rewards:
-    #     mean_reward = np.mean(all_rewards[-10:])
-    #     print(f"Średnia nagroda z ostatnich 10 epizodów: {mean_reward:.2f}")
+    if all_rewards:
+        mean_reward = np.mean(all_rewards[-10:])
+        print(f"Średnia nagroda z ostatnich 10 epizodów: {mean_reward:.2f}")
     
     # Zapis modelu
     torch.jit.save(current_model, args.save_path)
     print(f"Model zapisany do: {args.save_path}")
     
     # Zapisujemy wyniki do plików (opcjonalnie)
-    # np.save("episode_rewards.npy", np.array(all_rewards))
-    # np.save("losses.npy", np.array(losses))
-    # print("Wyniki treningu zapisane do plików: episode_rewards.npy oraz losses.npy")
+    np.save("episode_rewards.npy", np.array(all_rewards))
+    np.save("losses.npy", np.array(losses))
+    print("Wyniki treningu zapisane do plików: episode_rewards.npy oraz losses.npy")
     
     return all_rewards, losses
 
