@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-class DQN(nn.Module):
+class DQNHuman(nn.Module):
     def __init__(self, input_dim, n_actions):
-        super(DQN, self).__init__()
+        super(DQNHuman, self).__init__()
 
         self.conv = nn.Sequential(
             nn.Conv2d(input_dim[0], 32, kernel_size=8, stride=4),
@@ -30,3 +30,19 @@ class DQN(nn.Module):
     def forward(self, x):
         conv_out = self.conv(x).view(x.size()[0], -1)
         return self.fc(conv_out)
+
+
+class DQNCartPole(nn.Module):
+    def __init__(self, input_dim, n_actions):
+        super(DQNCartPole, self).__init__()
+
+        self.fc = nn.Sequential(
+            nn.Linear(input_dim[0], 64),
+            nn.ReLU(),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, n_actions)
+        )
+    
+    def forward(self, x):
+        return self.fc(x)

@@ -5,3 +5,5 @@ logs
 *.pth
 *.h5
 *.pt
+*.png
+**/__pycache__/
