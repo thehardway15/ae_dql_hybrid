@@ -1,44 +1,14 @@
-import numpy as np
+import time
 import random
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import copy
-from collections import namedtuple, deque
+from tqdm import tqdm
+from lib.metrics import Metrics
+from lib.config import Config
+from lib.utils import ReplayBuffer
 
-Config = namedtuple('Config', ['epsilon_start', 'epsilon_final', 'epsilon_decay', 
-                               'target_update_frequency', 'learning_starts', 'batch_size', 
-                               'gamma', 'update_frequency', 'replay_buffer_capacity', 'env_name', 'learning_rate' ])
-
-ConfigCartPole = Config(epsilon_start=1.0, epsilon_final=0.02, epsilon_decay=5_000,
-                        target_update_frequency=500, learning_starts=1_000, batch_size=128,
-                        gamma=0.99, update_frequency=4, replay_buffer_capacity=60_000, env_name='CartPole-v1', learning_rate=0.001)
-
-class ReplayBuffer:
-    def __init__(self, capacity: int, device: str):
-        self.buffer = deque(maxlen=capacity)
-        self.device = device
-
-    def push(self, state, action, reward, next_state, done):
-        self.buffer.append((state, action, reward, next_state, done))
-
-    def sample(self, batch_size: int):
-        batch = random.sample(self.buffer, batch_size)
-        states, actions, rewards, next_states, dones = zip(*batch)
-
-        return (
-            torch.FloatTensor(np.array(states)).to(self.device),
-            torch.LongTensor(actions).to(self.device),
-            torch.FloatTensor(rewards).to(self.device),
-            torch.FloatTensor(np.array(next_states)).to(self.device),
-            torch.FloatTensor(dones).to(self.device),
-        )
-    
-    def size(self):
-        return len(self.buffer)
-
-    def __len__(self):
-        return len(self.buffer)
 
 class DQNAgent:
     def __init__(self, config: Config, env, model: nn.Module, device: str, optimizer: optim.Optimizer):
@@ -53,7 +23,7 @@ class DQNAgent:
         self.target_model.to(device)
         self.total_frames = 0
         self.epsilon = config.epsilon_start
-        self.loss_list = []
+        self.history = Metrics()
 
     def _compute_loss(self, batch):
         states, actions, rewards, next_states, dones = batch
@@ -109,12 +79,40 @@ class DQNAgent:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-            self.loss_list.append(loss.item())
+            self.history.add('loss', loss.item())
 
         if self.total_frames % self.config.target_update_frequency == 0:
             self._update_target_network()
 
         return next_state
+
+    def train(self, epochs):
+        start_time = time.time()
+        epoch = 0
+        progress_bar = tqdm(total=epochs, desc='Training Progress')
+
+        while epoch < epochs:
+            start_time_episode = time.time()
+            state, _ = self.env.reset()
+            self.train_step(state)
+
+            while not self.env.done:
+                epoch += 1
+                next_state = self.train_step(state)
+                progress_bar.set_postfix({'total_reward': self.env.total_reward, 'epsilon': self.epsilon})
+                progress_bar.update(1)
+
+                state = next_state
+
+            end_time_episode = time.time()
+            self.history.add('frames_per_episode', self.env.frame_count)
+            self.history.add('reward_per_episode', self.env.total_reward)
+            self.history.add('time_per_episode', end_time_episode - start_time_episode)
+        
+        end_time = time.time()
+        self.history.add('total_time', end_time - start_time)
+        self.history.add('frames', self.total_frames)
+        print(f"Memory usage: {self.replay_buffer.memory_usage()} GB")
     
     def play(self):
         self.target_model.eval()

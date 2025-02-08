@@ -7,3 +7,4 @@ logs
 *.pt
 *.png
 **/__pycache__/
+*_result/
