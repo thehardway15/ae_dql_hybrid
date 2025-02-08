@@ -11,7 +11,7 @@ from lib.utils import ReplayBuffer
 
 
 class DQNAgent:
-    def __init__(self, config: Config, env, model: nn.Module, device: str, optimizer: optim.Optimizer):
+    def __init__(self, config: Config, env, model: nn.Module, device: str, optimizer: optim.Optimizer = None):
         self.config = config
         self.env = env
         self.model = model.to(device)
