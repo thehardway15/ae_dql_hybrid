@@ -35,6 +35,9 @@ class ReplayBuffer:
             torch.FloatTensor(np.array(next_states)).to(self.device),
             torch.FloatTensor(dones).to(self.device),
         )
+    
+    def merge(self, rb):
+        self.buffer += rb.buffer
 
     # memory usage in GB    
     def memory_usage(self):

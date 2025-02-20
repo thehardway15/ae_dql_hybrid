@@ -1,3 +1,4 @@
+import os
 import time
 import random
 import torch
@@ -44,11 +45,10 @@ class DQNAgent:
         self.target_model.load_state_dict(self.model.state_dict())
 
     def save_model(self, path: str):
+        dirs = '/'.join(path.split('/')[:-1])
+        if not os.path.exists(dirs):
+            os.makedirs(dirs)
         torch.save(self.target_model.state_dict(), path)
-
-    def load_model(self, path: str):
-        self.target_model.load_state_dict(torch.load(path))
-        self.model.load_state_dict(torch.load(path))
 
     def _action(self, state):
         if random.random() < self.epsilon:
@@ -108,28 +108,11 @@ class DQNAgent:
             self.history.add('frames_per_episode', self.env.frame_count)
             self.history.add('reward_per_episode', self.env.total_reward)
             self.history.add('time_per_episode', end_time_episode - start_time_episode)
+            self.history.add('memory_usage', self.replay_buffer.memory_usage())
+            self.history.add('replay_buffer_size', self.replay_buffer.size())
         
         end_time = time.time()
         self.history.add('total_time', end_time - start_time)
         self.history.add('frames', self.total_frames)
         print(f"Memory usage: {self.replay_buffer.memory_usage()} GB")
     
-    def play(self):
-        self.target_model.eval()
-        self.epsilon = 0.0
-
-        state, _ = self.env.reset()
-        done = False
-        episode_reward = 0
-
-        while not done:
-            action = self._action(state)
-            next_state, reward, _ = self.env.step(action)
-            done = self.env.done
-            state = next_state
-            episode_reward += reward
-            self.env.render()
-        
-        print(f"Episode Reward: {episode_reward}")
-        self.env.close()
-

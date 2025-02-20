@@ -1,12 +1,13 @@
 # Automated Environment DQN Learning (AE-DQL)
 
-A deep reinforcement learning implementation that combines Deep Q-Learning (DQL) with Algorithm Evolution (AE) for automated environment interaction and learning. This project focuses on training agents using both gradient-based (DQN) and evolutionary approaches to perform optimally in various Gymnasium environments, with a particular emphasis on CartPole and Atari games.
+A deep reinforcement learning implementation that combines Deep Q-Learning (DQL) with Algorithm Evolution (AE) for automated environment interaction and learning. This project features three distinct training approaches: gradient-based DQN, evolutionary optimization (AE), and a hybrid approach combining both methods. The implementation is tested on various Gymnasium environments, with a particular emphasis on CartPole and Atari games.
 
 ## Features
 
-- Dual learning approaches:
+- Three learning approaches:
   - Deep Q-Network (DQN) with experience replay (gradient-based learning)
   - Algorithm Evolution (AE) with population-based optimization
+  - Hybrid approach combining DQN and AE
 - Support for multiple environments (CartPole, Atari games)
 - Configurable hyperparameters and network architecture
 - Real-time training metrics and visualization
@@ -58,7 +59,7 @@ pip install -r requirements.txt
 
 ### Training
 
-The project supports two training approaches:
+The project supports three training approaches:
 
 1. Gradient-based DQN training:
 ```bash
@@ -80,17 +81,28 @@ python main.py --mode train \
                --config ConfigAE
 ```
 
+3. Hybrid DQN-AE training:
+```bash
+python main.py --mode train \
+               --version hybrid \
+               --model_path hybrid_model.pt \
+               --epochs 100 \
+               --model_name DQNCartPole \
+               --config ConfigHybrid
+```
+
 Available parameters:
 - `--mode`: Choose between "train" or "render"
-- `--version`: Training version - "gradient" (DQN) or "ae" (Algorithm Evolution)
+- `--version`: Training version - "gradient" (DQN), "ae" (Algorithm Evolution), or "hybrid"
 - `--model_path`: Path to save/load the model (default: "dqn_model.pt")
 - `--epochs`: Number of training epochs
   - For DQN: typically 100000
-  - For AE: typically 100 (generations)
+  - For AE/Hybrid: typically 100 (generations)
 - `--model_name`: Name of the model class to use (default: "DQNCartPole")
 - `--config`: Name of the configuration class to use
   - For DQN: "ConfigCartPole"
   - For AE: "ConfigAE"
+  - For Hybrid: "ConfigHybrid"
 
 ### Rendering
 
@@ -98,10 +110,10 @@ To visualize a trained agent's performance:
 
 ```bash
 python main.py --mode render \
-               --version ae \  # or gradient
+               --version gradient \  # or "ae" or "hybrid"
                --model_path model_save.pt \
                --model_name DQNCartPole \
-               --config ConfigCartPole  # or ConfigAE
+               --config ConfigCartPole  # or appropriate config
 ```
 
 ## Project Structure
@@ -109,7 +121,10 @@ python main.py --mode render \
 ```
 ae_dql_hybrid/
 ├── lib/
-│   ├── agents/         # Agent implementations (DQN and AE)
+│   ├── agents/         # Agent implementations (DQN, AE, and Hybrid)
+│   │   ├── ae.py      # Algorithm Evolution agent
+│   │   ├── hybrid.py  # Hybrid DQN-AE agent
+│   │   └── dqn.py     # DQN agent
 │   ├── model/          # Neural network architectures
 │   ├── environ/        # Environment wrappers
 │   ├── config.py       # Configuration parameters
@@ -138,6 +153,10 @@ Algorithm Evolution Configuration:
 - Mutation noise standard deviation
 - Network architecture
 
+Hybrid Configuration:
+- Combines parameters from both DQN and AE
+- Additional hybrid-specific parameters for balancing both approaches
+
 ## Results
 
 Training results and metrics are saved in separate directories for each approach:
@@ -153,10 +172,12 @@ The metrics tracked include:
 - Episode rewards
 - Training time
 - Frame count
-- For AE: 
+- For AE and Hybrid: 
   - Population fitness statistics
   - Best individual performance
   - Generation statistics
+  - Average/Max/Std rewards per epoch
+  - Training speed metrics
 
 ## Contributing
 

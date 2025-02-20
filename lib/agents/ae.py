@@ -1,4 +1,5 @@
 import copy
+import os
 import time
 import torch
 import numpy as np
@@ -20,22 +21,15 @@ class AEAgent:
     def __init__(self, config: Config, model_class,  device: str):
         self.config = config
         self.model_class = model_class
-        self.target_model = None
         self.total_frames = 0
         self.history = Metrics()
         self.device = device
 
-    def _action(self, state):
-        with torch.no_grad():
-            state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
-            return self.target_model(state).argmax().item()
-
     def save_model(self, net: nn.Module, path: str):
+        dirs = '/'.join(path.split('/')[:-1])
+        if not os.path.exists(dirs):
+            os.makedirs(dirs)
         torch.save(net.state_dict(), path)
-
-    def load_model(self, path: str, env: Environment):
-        self.target_model = self.model_class(env.observation_space.shape, env.action_space.n)
-        self.target_model.load_state_dict(torch.load(path))
 
     def _make_net(self, seeds: list[int], env: Environment):
         torch.manual_seed(seeds[0])
@@ -178,26 +172,3 @@ class AEAgent:
         print(f"Total frames: {self.total_frames}")
         env = Environment(self.config.env_name)
         return self._make_net(elite[0], env)
-
-    def play(self, path: str):
-        env = Environment(self.config.env_name, render='human')
-        self.load_model(path, env)
-
-        self.target_model.to(self.device)
-        self.target_model.eval()
-
-        state, _ = env.reset()
-        done = False
-        episode_reward = 0
-
-        while not done:
-            action = self._action(state)
-            next_state, reward, _ = env.step(action)
-            done = env.done
-            state = next_state
-            episode_reward += reward
-            env.render()
-        
-        print(f"Episode Reward: {episode_reward}")
-        env.close()
-
