@@ -12,7 +12,7 @@ from lib.utils import ReplayBuffer
 
 
 class DQNAgent:
-    def __init__(self, config: Config, env, model: nn.Module, device: str, optimizer: optim.Optimizer = None):
+    def __init__(self, config: Config, env, model: nn.Module, device: str, optimizer: optim.Optimizer = None, checkpoints: int = 1000, path: str = None):
         self.config = config
         self.env = env
         self.model = model.to(device)
@@ -25,6 +25,8 @@ class DQNAgent:
         self.total_frames = 0
         self.epsilon = config.epsilon_start
         self.history = Metrics()
+        self.checkpoints = checkpoints
+        self.path = path
 
     def _compute_loss(self, batch):
         states, actions, rewards, next_states, dones = batch
@@ -45,10 +47,13 @@ class DQNAgent:
         self.target_model.load_state_dict(self.model.state_dict())
 
     def save_model(self, path: str):
-        dirs = '/'.join(path.split('/')[:-1])
-        if not os.path.exists(dirs):
-            os.makedirs(dirs)
-        torch.save(self.target_model.state_dict(), path)
+        torch.save(self.target_model.state_dict(), os.path.join(path, 'model.pt'))
+    
+    def save_history(self, path: str):
+        self.history.save(path)
+        self.history.summary(path, 
+                          plots=['frames_per_episode', 'reward_per_episode', 'time_per_episode', 'loss', 'memory_usage', 'replay_buffer_size'],
+                          additional_stats=['frames_last / total_time_last'])
 
     def _action(self, state):
         if random.random() < self.epsilon:
@@ -90,6 +95,7 @@ class DQNAgent:
         start_time = time.time()
         epoch = 0
         progress_bar = tqdm(total=epochs, desc='Training Progress')
+        episode = 0
 
         while epoch < epochs:
             start_time_episode = time.time()
@@ -104,12 +110,20 @@ class DQNAgent:
 
                 state = next_state
 
+            episode += 1
             end_time_episode = time.time()
             self.history.add('frames_per_episode', self.env.frame_count)
             self.history.add('reward_per_episode', self.env.total_reward)
             self.history.add('time_per_episode', end_time_episode - start_time_episode)
             self.history.add('memory_usage', self.replay_buffer.memory_usage())
             self.history.add('replay_buffer_size', self.replay_buffer.size())
+
+            if episode % self.checkpoints == 0:
+                checkpoint_path = os.path.join(self.path, f'checkpoint_{episode}')
+                if not os.path.exists(checkpoint_path):
+                    os.makedirs(checkpoint_path)
+                self.save_model(checkpoint_path)
+                self.save_history(checkpoint_path)
         
         end_time = time.time()
         self.history.add('total_time', end_time - start_time)

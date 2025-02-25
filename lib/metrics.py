@@ -1,4 +1,5 @@
 import json
+import os
 
 from matplotlib import pyplot as plt
 import numpy as np
@@ -27,11 +28,11 @@ class Metrics:
 
         self.store[namespace][key].append(value)
 
-    def save(self, filename):
-        with open(filename + '.json', 'w') as f:
+    def save(self, path: str):
+        with open(os.path.join(path, 'metrics.json'), 'w') as f:
             json.dump(self.store, f)
 
-    def summary(self, filename, plots=[], additional_stats=[]):
+    def summary(self, path: str, plots=[], additional_stats=[]):
         summary = {}
         for namespace in self.namespaces:
             stats = {}
@@ -45,18 +46,22 @@ class Metrics:
             
             for pattern in additional_stats:
                 key1, op, key2 = pattern.split(' ')
+                if key1 not in stats or key2 not in stats:
+                    continue
                 stats[key1 + '_' + op + '_' + key2] = eval(f'{stats[key1]} {op} {stats[key2]}')
 
             for plot in plots:
+                if plot not in self.store[namespace]:
+                    continue
                 plt.plot(self.store[namespace][plot])
                 plt.title(plot.replace('_', ' ').capitalize())
                 plt.xlabel('Episode')
                 plt.ylabel(plot.split('_')[0].capitalize())
-                plt.savefig(filename + f'_{plot}.png')
+                plt.savefig(os.path.join(path, f'{plot}.png'))
                 plt.close()
 
             summary[namespace] = stats
         
-        with open(filename + '_summary.json', 'w') as f:
+        with open(os.path.join(path, 'summary.json'), 'w') as f:
             json.dump(summary, f)
 

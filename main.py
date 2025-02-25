@@ -1,3 +1,4 @@
+import os
 import sys
 import torch
 import argparse
@@ -19,15 +20,12 @@ def train_gradient(args):
     env = Environment(config_class.env_name)
     model = model_class(env.observation_space.shape, env.action_space.n)
     optimizer = optim.Adam(model.parameters(), lr=config_class.learning_rate)
-    agent = DQNAgent(config_class, env, model, device, optimizer)
+    agent = DQNAgent(config_class, env, model, device, optimizer, args.checkpoints, args.model_path)
     epochs = args.epochs
 
     agent.train(epochs)
     agent.save_model(args.model_path)
-    agent.history.save(args.model_path.replace('.pt', ''))
-    agent.history.summary(args.model_path.replace('.pt', ''), 
-                          plots=['frames_per_episode', 'reward_per_episode', 'time_per_episode', 'loss', 'memory_usage', 'replay_buffer_size'],
-                          additional_stats=['frames_last / total_time_last'])
+    agent.save_history(args.model_path)
 
                         
 def train_ae(args):
@@ -35,13 +33,10 @@ def train_ae(args):
     config_class = getattr(config, args.config)
     epochs = args.epochs
 
-    agent = AEAgent(config_class, model_class, device)
+    agent = AEAgent(config_class, model_class, device, args.checkpoints, args.model_path)
     net = agent.train(epochs)
     agent.save_model(net, args.model_path)
-    agent.history.save(args.model_path.replace('.pt', ''))
-    agent.history.summary(args.model_path.replace('.pt', ''), 
-                          plots=['frames_per_epoch', 'reward_avg', 'reward_max', 'reward_std', 'speed'],
-                          additional_stats=['frames_last / total_time_last'])
+    agent.save_history(args.model_path)
                         
                         
 def train_hybrid(args):
@@ -49,16 +44,15 @@ def train_hybrid(args):
     config_class = getattr(config, args.config)
     epochs = args.epochs
 
-    agent = HybridAgent(config_class, model_class, device)
+    agent = HybridAgent(config_class, model_class, device, args.checkpoints, args.model_path)
     net = agent.train(epochs)
     agent.save_model(net, args.model_path)
-    agent.history.save(args.model_path.replace('.pt', ''))
-    agent.history.summary(args.model_path.replace('.pt', ''), 
-                          plots=['frames_per_epoch', 'reward_avg', 'reward_max', 'reward_std', 'speed', 'memory_usage', 'replay_buffer_size'],
-                          additional_stats=['frames_last / total_time_last'])
+    agent.save_history(args.model_path)
 
 def train(args):
     version = args.version
+    if not os.path.exists(args.model_path):
+        os.makedirs(args.model_path)
 
     if version == "gradient":
         train_gradient(args)
@@ -75,7 +69,7 @@ def render(args):
     config_class = getattr(config, args.config)
     env = Environment(config_class.env_name, render='human')
     model = model_class(env.observation_space.shape, env.action_space.n)
-    model.load_state_dict(torch.load(args.model_path))
+    model.load_state_dict(torch.load(os.path.join(args.model_path, 'model.pt')))
     model.to(device)
     model.eval()
 
@@ -106,6 +100,7 @@ def main():
     parser.add_argument("--epochs", type=int, default=100_000, help="Liczba epok treningu")
     parser.add_argument("--model_name", type=str, default="DQNCartPole", help="Nazwa modelu")
     parser.add_argument("--config", type=str, default="ConfigCartPole", help="Nazwa konfiguracji")
+    parser.add_argument("--checkpoints", type=int, default=1000, help="Liczba checkpointów")
     
     args = parser.parse_args()
     

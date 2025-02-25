@@ -157,15 +157,45 @@ Hybrid Configuration:
 - Combines parameters from both DQN and AE
 - Additional hybrid-specific parameters for balancing both approaches
 
-## Results
+## Results and Checkpoints
 
 Training results and metrics are saved in separate directories for each approach:
 - DQN results: `cartpol_result/`
 - Algorithm Evolution results: `cartpol_ae_result/`
 
+### Checkpoints
+During training, the system automatically saves checkpoints to allow resuming training or analyzing intermediate results:
+
+- Model checkpoints: Saved as `.pt` files with the format:
+  ```
+  {model_path}/checkpoint_{epoch}/model.pt
+  ```
+  For example: `dqn_model/checkpoint_1000/model.pt`
+
+- Metrics checkpoints: Saved as JSON files with the format:
+  ```
+  {model_path}/checkpoint_{epoch}/metrics.json
+  ```
+  For example: `dqn_model/checkpoint_1000/metrics.json`
+
+Checkpoint frequency:
+- DQN: Every 1000 epochs
+- AE/Hybrid: Every 10 generations
+
+To resume training from a checkpoint:
+```bash
+python main.py --mode train \
+               --version gradient \  # or "ae" or "hybrid"
+               --model_path dqn_model_checkpoint_1000.pt \
+               --epochs 100000 \
+               --model_name DQNCartPole \
+               --config ConfigCartPole
+```
+
+### Training Artifacts
 Each directory contains:
-- Model weights: `.pt` files
-- Training metrics: JSON format
+- Model weights: `.pt` files (final and checkpoints)
+- Training metrics: JSON format (final and checkpoints)
 - Performance plots: Generated using matplotlib (`.png` files)
 
 The metrics tracked include:

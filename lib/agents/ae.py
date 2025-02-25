@@ -18,20 +18,28 @@ OutputItem = namedtuple('OutputItem', ['seeds', 'fitness', 'frames'])
 
 
 class AEAgent:
-    def __init__(self, config: Config, model_class,  device: str):
+    def __init__(self, config: Config, model_class,  device: str, checkpoints: int = 1000, path: str = None):
         self.config = config
         self.model_class = model_class
         self.total_frames = 0
         self.history = Metrics()
         self.device = device
+        self.checkpoints = checkpoints
+        self.path = path
 
     def save_model(self, net: nn.Module, path: str):
-        dirs = '/'.join(path.split('/')[:-1])
-        if not os.path.exists(dirs):
-            os.makedirs(dirs)
-        torch.save(net.state_dict(), path)
+        torch.save(net.state_dict(), os.path.join(path, 'model.pt'))
 
-    def _make_net(self, seeds: list[int], env: Environment):
+    def save_history(self, path: str):
+        self.history.save(path)
+        self.history.summary(path, 
+                          plots=['frames_per_epoch', 'reward_avg', 'reward_max', 'reward_std', 'speed'],
+                          additional_stats=['frames_last / total_time_last'])       
+
+    def _make_net(self, seeds: list[int], env: Environment = None):
+        if env is None:
+            env = Environment(self.config.env_name)
+
         torch.manual_seed(seeds[0])
         net = self.model_class(env.observation_space.shape, env.action_space.n)
         net = net.to(self.device)
@@ -147,10 +155,17 @@ class AEAgent:
 
             elite = population[0]
 
+            if epoch % self.checkpoints == 0:
+                checkpoint_path = os.path.join(self.path, f'checkpoint_{epoch}')
+                if not os.path.exists(checkpoint_path):
+                    os.makedirs(checkpoint_path)
+                self.save_model(self._make_net(elite[0]), checkpoint_path)
+                self.save_history(checkpoint_path)
+
             self.total_frames += batch_step
 
             for worker_queue in input_queues:
-                seeds = []
+                seeds = [elite[0]]
                 for _ in range(SEEDS_PER_WORKER):
                     parent = np.random.randint(self.config.parent_count)
                     next_seed = np.random.randint(MAX_SEED)
@@ -170,5 +185,4 @@ class AEAgent:
         print(f"Training time: {training_time:.2f} seconds")
         print(f"Training finished after {epoch} epochs")
         print(f"Total frames: {self.total_frames}")
-        env = Environment(self.config.env_name)
-        return self._make_net(elite[0], env)
+        return self._make_net(elite[0])

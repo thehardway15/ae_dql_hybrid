@@ -25,19 +25,25 @@ OutputItem = namedtuple('OutputItem', ['individual', 'fitness', 'frames', 'rb'])
 
 
 class HybridAgent:
-    def __init__(self, config: Config, model_class,  device: str):
+    def __init__(self, config: Config, model_class,  device: str, checkpoints: int = 1000, path: str = None):
         self.config = config
         self.model_class = model_class
         self.total_frames = 0
         self.history = Metrics()
         self.device = device
         self.replay_buffer = ReplayBuffer(config.replay_buffer_capacity, device)
+        self.checkpoints = checkpoints
+        self.path = path
+
 
     def save_model(self, net: nn.Module, path: str):
-        dirs = '/'.join(path.split('/')[:-1])
-        if not os.path.exists(dirs):
-            os.makedirs(dirs)
-        torch.save(net.state_dict(), path)
+        torch.save(net.state_dict(), os.path.join(path, 'model.pt'))
+
+    def save_history(self, path: str):
+        self.history.save(path)
+        self.history.summary(path, 
+                            plots=['frames_per_epoch', 'reward_avg', 'reward_max', 'reward_std', 'speed', 'memory_usage', 'replay_buffer_size', 'gradient_count'],
+                            additional_stats=['frames_last / total_time_last'])
 
     def _compute_loss(self, batch, model, target_model):
         states, actions, rewards, next_states, dones = batch
@@ -68,6 +74,7 @@ class HybridAgent:
             loss.backward()
             optimizer.step()
         
+        # TODO: delta_min, delta_step per layer
         compressed_wights = {}
         for name, param in target_model.named_parameters():
             tuned_param = dict(model.named_parameters())[name]
@@ -91,7 +98,10 @@ class HybridAgent:
 
         return (nonzero_indices, values.tolist()), delta_min, delta_step
 
-    def _make_net(self, individual: Individual, env: Environment):
+    def _make_net(self, individual: Individual, env: Environment = None):
+        if env is None:
+            env = Environment(self.config.env_name)
+
         seeds = individual.seeds
         torch.manual_seed(seeds[0])
         net = self.model_class(env.observation_space.shape, env.action_space.n)
@@ -234,26 +244,39 @@ class HybridAgent:
             self.history.add('time_per_epoch', time.time() - epoch_start)
 
             elite = population[0]
+
+            if epoch % self.checkpoints == 0:
+                checkpoint_path = os.path.join(self.path, f'checkpoint_{epoch}')
+                if not os.path.exists(checkpoint_path):
+                    os.makedirs(checkpoint_path)
+                self.save_model(self._make_net(elite[0]), checkpoint_path)
+                self.save_history(checkpoint_path)
+                
             for individual in population[::-1]:
                 self.replay_buffer.merge(individual[3])
             
             self.history.add('memory_usage', self.replay_buffer.memory_usage())
             self.history.add('replay_buffer_size', self.replay_buffer.size())
                 
-            self._train_gradient(elite[0])
+            if epoch % self.config.hybrid_gradient_frequency == 0:
+                self._train_gradient(elite[0])
 
             self.total_frames += batch_step
+            gradient_count = 0
 
             for worker_queue in input_queues:
-                individuals = []
+                individuals = [elite[0]]
                 for _ in range(SEEDS_PER_WORKER):
                     parent = np.random.randint(self.config.parent_count)
                     next_seed = np.random.randint(MAX_SEED)
                     s = list(population[parent][0].seeds) + [next_seed]
                     individuals.append(Individual(seeds=tuple(s), parameters=copy.deepcopy(population[parent][0].parameters)))
+                gradient_count += len(list(filter(lambda x: len(x.parameters) > 0, individuals)))
                 worker_queue.put(individuals)
             progress_bar.update(1)
             epoch += 1
+
+            self.history.add('gradient_count', gradient_count)
 
         for worker in workers:
             worker.terminate()
@@ -265,5 +288,5 @@ class HybridAgent:
         print(f"Training time: {training_time:.2f} seconds")
         print(f"Training finished after {epoch} epochs")
         print(f"Total frames: {self.total_frames}")
-        env = Environment(self.config.env_name)
-        return self._make_net(elite[0], env)
+        print(f"Elite gradient count: {len(elite[0].parameters)}")
+        return self._make_net(elite[0])
