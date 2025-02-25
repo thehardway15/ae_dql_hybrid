@@ -1,5 +1,6 @@
 import copy
 import os
+import random
 import time
 import torch
 import numpy as np
@@ -7,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 from lib.config import Config
-from lib.environ import Environment
+from lib.environ import Environment, make_env
 from lib.metrics import Metrics
 from collections import namedtuple
 import torch.multiprocessing as mp
@@ -64,7 +65,7 @@ class HybridAgent:
         return loss
     
     def _train_gradient(self, individual):
-        env = Environment(self.config.env_name)
+        env = make_env(self.config)
         target_model = self._make_net(individual, env)
         model = copy.deepcopy(target_model)
 
@@ -84,7 +85,7 @@ class HybridAgent:
             delta_W = tuned_param.data - param.data
             compressed_wights[name], delta_min, delta_step = self._sparsify_and_quantize(delta_W)
 
-        individual.parameters.append((compressed_wights, delta_min.to('cpu'), delta_step.to('cpu')))
+        individual.parameters.append((compressed_wights, delta_min.to('cpu').numpy(), delta_step.to('cpu').numpy()))
 
     # TODO: zweryfikować obliczenia
     def _sparsify_and_quantize(self, weights):
@@ -99,11 +100,15 @@ class HybridAgent:
         nonzero_indices = (sparse_weights != 0).to('cpu').nonzero(as_tuple=True)
         values = quantized_weight[nonzero_indices]
 
+        nonzero_indices = [x.numpy() for x in nonzero_indices]
+        # delta_min = delta_min.to('cpu').numpy()
+        # delta_step = delta_step.to('cpu').numpy()
+
         return (nonzero_indices, values.tolist()), delta_min, delta_step
 
     def _make_net(self, individual: Individual, env: Environment = None):
         if env is None:
-            env = Environment(self.config.env_name)
+            env = make_env(self.config)
 
         seeds = individual.seeds
         torch.manual_seed(seeds[0])
@@ -123,12 +128,14 @@ class HybridAgent:
             compressed_weights, delta_min, delta_step = parameter
             reconstructed_weights = torch.zeros_like(param.data)
 
-            delta_min = delta_min.to(self.device)
-            delta_step = delta_step.to(self.device)
+            delta_min = torch.tensor(delta_min).to(self.device)
+            delta_step = torch.tensor(delta_step).to(self.device)
             reconstructed_weights = reconstructed_weights.to(self.device)
-            
+
             indexes, values = compressed_weights[name]
             values = torch.tensor(values).to(self.device)
+
+            indexes = [torch.tensor(x).to(self.device) for x in indexes]
 
             if isinstance(indexes, torch.Tensor):
                 reconstructed_weights[indexes] = delta_min + (values - 1) * delta_step
@@ -170,7 +177,7 @@ class HybridAgent:
         return episode_reward, frames, rb
     
     def _evaluate_worker(self, input_queue, output_queue):
-        env = Environment(self.config.env_name)
+        env = make_env(self.config)
         cache = {}
 
         while True:
@@ -194,8 +201,18 @@ class HybridAgent:
             
             cache = new_cache
 
+    def debug(self):
+        env = make_env(self.config)
+        individual = Individual(seeds=(np.random.randint(MAX_SEED),), parameters=[])
+        net = self._make_net(individual, env)
+        for _ in range(100):
+            _, _, rb = self._evaluate(net, env)
+            self.replay_buffer.merge(rb)
+        self._train_gradient(individual)
+        self._make_net(individual, env)
+
     def train(self, epochs: int):
-        mp.set_start_method('spawn')
+        mp.set_start_method('forkserver', force=True)
         progress_bar = tqdm(range(epochs), desc="Training")
 
         SEEDS_PER_WORKER = self.config.population_size // self.config.worker_count
@@ -271,10 +288,12 @@ class HybridAgent:
                 individuals = []
                 if i == 0:
                     individuals.append(elite[0].copy())
-                for _ in range(SEEDS_PER_WORKER):
+                while len(individuals) < SEEDS_PER_WORKER:
                     parent = np.random.randint(self.config.parent_count)
-                    next_seed = np.random.randint(MAX_SEED)
-                    s = list(population[parent][0].seeds) + [next_seed]
+                    s = list(population[parent][0].seeds)
+                    if random.random() < self.config.mutation_rate:
+                        next_seed = np.random.randint(MAX_SEED)
+                        s.append(next_seed)
                     individuals.append(Individual(seeds=tuple(s), parameters=copy.deepcopy(population[parent][0].parameters)))
                 gradient_count += len(list(filter(lambda x: len(x.parameters) > 0, individuals)))
                 worker_queue.put(individuals)
@@ -285,6 +304,7 @@ class HybridAgent:
 
         for worker in workers:
             worker.terminate()
+            worker.join()
 
         training_time = time.time() - t_start
         self.history.add('total_time', training_time)

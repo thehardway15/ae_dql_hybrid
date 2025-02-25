@@ -1,12 +1,13 @@
 import copy
 import os
+import random
 import time
 import torch
 import numpy as np
 import torch.nn as nn
 from tqdm import tqdm
 from lib.config import Config
-from lib.environ import Environment
+from lib.environ import Environment, make_env
 from lib.metrics import Metrics
 from collections import namedtuple
 import torch.multiprocessing as mp
@@ -38,7 +39,7 @@ class AEAgent:
 
     def _make_net(self, seeds: list[int], env: Environment = None):
         if env is None:
-            env = Environment(self.config.env_name)
+            env = make_env(self.config)
 
         torch.manual_seed(seeds[0])
         net = self.model_class(env.observation_space.shape, env.action_space.n)
@@ -77,7 +78,7 @@ class AEAgent:
 
     
     def _evaluate_worker(self, input_queue, output_queue):
-        env = Environment(self.config.env_name)
+        env = make_env(self.config)
         cache = {}
 
         while True:
@@ -102,7 +103,7 @@ class AEAgent:
             cache = new_cache
 
     def train(self, epochs: int):
-        mp.set_start_method('spawn')
+        mp.set_start_method('forkserver')
         progress_bar = tqdm(range(epochs), desc="Training")
 
         SEEDS_PER_WORKER = self.config.population_size // self.config.worker_count
@@ -169,10 +170,12 @@ class AEAgent:
                 if i == 0:
                     seeds.append(elite[0])
 
-                for _ in range(SEEDS_PER_WORKER):
+                while len(seeds) < SEEDS_PER_WORKER:
                     parent = np.random.randint(self.config.parent_count)
-                    next_seed = np.random.randint(MAX_SEED)
-                    s = list(population[parent][0]) + [next_seed]
+                    s = list(population[parent][0])
+                    if random.random() < self.config.mutation_rate:
+                        next_seed = np.random.randint(MAX_SEED)
+                        s.append(next_seed)
                     seeds.append(tuple(s))
                 worker_queue.put(seeds)
             progress_bar.update(1)
@@ -180,6 +183,7 @@ class AEAgent:
 
         for worker in workers:
             worker.terminate()
+            worker.join()
 
         training_time = time.time() - t_start
         self.history.add('total_time', training_time)

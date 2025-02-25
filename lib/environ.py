@@ -4,6 +4,16 @@ import numpy as np
 
 gym.register_envs(ale_py)
 
+def make_env(config, render='rgb_array'):
+    env_name = config.env_name
+    atari_preprocessing = config.atari_preprocessing
+    frame_stack = config.frame_stack
+    clip_rewards = config.clip_rewards
+    terminal_on_life_loss = config.terminal_on_life_loss
+
+    return Environment(env_name, atari_preprocessing, frame_stack, clip_rewards, terminal_on_life_loss, render)
+    
+
 class Environment:
     def __init__(self, env_name, atari_preprocessing=False, frame_stack=False, 
                  clip_rewards=True, terminal_on_life_loss=False, render='rgb_array'):
