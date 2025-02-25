@@ -155,7 +155,7 @@ class AEAgent:
 
             elite = population[0]
 
-            if epoch % self.checkpoints == 0:
+            if self.checkpoints is not None and epoch > 0 and epoch % self.checkpoints == 0:
                 checkpoint_path = os.path.join(self.path, f'checkpoint_{epoch}')
                 if not os.path.exists(checkpoint_path):
                     os.makedirs(checkpoint_path)
@@ -164,8 +164,11 @@ class AEAgent:
 
             self.total_frames += batch_step
 
-            for worker_queue in input_queues:
-                seeds = [elite[0]]
+            for i, worker_queue in enumerate(input_queues):
+                seeds = []
+                if i == 0:
+                    seeds.append(elite[0])
+
                 for _ in range(SEEDS_PER_WORKER):
                     parent = np.random.randint(self.config.parent_count)
                     next_seed = np.random.randint(MAX_SEED)

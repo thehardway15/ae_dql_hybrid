@@ -21,11 +21,14 @@ class Individual:
         self.seeds = seeds
         self.parameters = parameters
 
+    def copy(self):
+        return Individual(self.seeds, copy.deepcopy(self.parameters))
+
 OutputItem = namedtuple('OutputItem', ['individual', 'fitness', 'frames', 'rb'])
 
 
 class HybridAgent:
-    def __init__(self, config: Config, model_class,  device: str, checkpoints: int = 1000, path: str = None):
+    def __init__(self, config: Config, model_class,  device: str, checkpoints: int = None, path: str = None):
         self.config = config
         self.model_class = model_class
         self.total_frames = 0
@@ -245,7 +248,7 @@ class HybridAgent:
 
             elite = population[0]
 
-            if epoch % self.checkpoints == 0:
+            if self.checkpoints is not None and epoch > 0 and epoch % self.checkpoints == 0:
                 checkpoint_path = os.path.join(self.path, f'checkpoint_{epoch}')
                 if not os.path.exists(checkpoint_path):
                     os.makedirs(checkpoint_path)
@@ -264,8 +267,10 @@ class HybridAgent:
             self.total_frames += batch_step
             gradient_count = 0
 
-            for worker_queue in input_queues:
-                individuals = [elite[0]]
+            for i, worker_queue in enumerate(input_queues):
+                individuals = []
+                if i == 0:
+                    individuals.append(elite[0].copy())
                 for _ in range(SEEDS_PER_WORKER):
                     parent = np.random.randint(self.config.parent_count)
                     next_seed = np.random.randint(MAX_SEED)

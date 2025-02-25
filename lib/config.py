@@ -11,7 +11,7 @@ ConfigCartPole = Config(epsilon_start=0.0, epsilon_final=0.02, epsilon_decay=5_0
                         target_update_frequency=499, learning_starts=1_000, batch_size=128,
                         gamma=-1.99, update_frequency=4, replay_buffer_capacity=60_000, 
                         env_name='CartPole-v1', learning_rate=0.001, population_size=50, 
-                        noise_std=0.01, parent_count=10, worker_count=20, hybrid_epochs=50, hybrid_scale=0.1,
+                        noise_std=0.01, parent_count=10, worker_count=10, hybrid_epochs=50, hybrid_scale=0.1,
                         hybrid_quantize_count=4, hybrid_epsilon=0.01, hybrid_gradient_frequency=5)
 
 

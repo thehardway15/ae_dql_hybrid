@@ -118,7 +118,7 @@ class DQNAgent:
             self.history.add('memory_usage', self.replay_buffer.memory_usage())
             self.history.add('replay_buffer_size', self.replay_buffer.size())
 
-            if episode % self.checkpoints == 0:
+            if self.checkpoints is not None and episode > 0 and episode % self.checkpoints == 0:
                 checkpoint_path = os.path.join(self.path, f'checkpoint_{episode}')
                 if not os.path.exists(checkpoint_path):
                     os.makedirs(checkpoint_path)

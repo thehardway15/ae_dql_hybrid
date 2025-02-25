@@ -100,7 +100,7 @@ def main():
     parser.add_argument("--epochs", type=int, default=100_000, help="Liczba epok treningu")
     parser.add_argument("--model_name", type=str, default="DQNCartPole", help="Nazwa modelu")
     parser.add_argument("--config", type=str, default="ConfigCartPole", help="Nazwa konfiguracji")
-    parser.add_argument("--checkpoints", type=int, default=1000, help="Liczba checkpointów")
+    parser.add_argument("--checkpoints", type=int, default=None, help="Liczba checkpointów")
     
     args = parser.parse_args()
     
