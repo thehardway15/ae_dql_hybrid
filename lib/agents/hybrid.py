@@ -46,7 +46,7 @@ class HybridAgent:
     def save_history(self, path: str):
         self.history.save(path)
         self.history.summary(path, 
-                            plots=['frames_per_epoch', 'reward_avg', 'reward_max', 'reward_std', 'speed', 'memory_usage', 'replay_buffer_size', 'gradient_count'],
+                            plots=['frames_per_episode', 'reward_avg', 'reward_max', 'reward_std', 'speed', 'memory_usage', 'replay_buffer_size', 'gradient_count'],
                             additional_stats=['frames_last / total_time_last'])
 
     def _compute_loss(self, batch, model, target_model):
@@ -219,6 +219,9 @@ class HybridAgent:
 
         input_queues= []
         workers = []
+        
+        episode = 0
+
         output_queues = mp.Queue(maxsize=self.config.worker_count)
 
         for _ in range(self.config.worker_count):
@@ -234,7 +237,7 @@ class HybridAgent:
         elite = None
 
         t_start = time.time()
-        while epoch < epochs:
+        while self.total_frames < epochs:
             epoch_start = time.time()
             batch_step = 0
             population = []
@@ -260,13 +263,13 @@ class HybridAgent:
             self.history.add('reward_max', reward_max)
             self.history.add('reward_std', reward_std)
             self.history.add('speed', speed)
-            self.history.add('frames_per_epoch', batch_step)
-            self.history.add('time_per_epoch', time.time() - epoch_start)
+            self.history.add('frames_per_episode', batch_step)
+            self.history.add('time_per_episode', time.time() - epoch_start)
 
             elite = population[0]
 
-            if self.checkpoints is not None and epoch > 0 and epoch % self.checkpoints == 0:
-                checkpoint_path = os.path.join(self.path, f'checkpoint_{epoch}')
+            if self.checkpoints is not None and episode > 0 and episode % self.checkpoints == 0:
+                checkpoint_path = os.path.join(self.path, f'checkpoint_{episode}')
                 if not os.path.exists(checkpoint_path):
                     os.makedirs(checkpoint_path)
                 self.save_model(self._make_net(elite[0]), checkpoint_path)
@@ -297,8 +300,8 @@ class HybridAgent:
                     individuals.append(Individual(seeds=tuple(s), parameters=copy.deepcopy(population[parent][0].parameters)))
                 gradient_count += len(list(filter(lambda x: len(x.parameters) > 0, individuals)))
                 worker_queue.put(individuals)
-            progress_bar.update(1)
-            epoch += 1
+            progress_bar.update(batch_step)
+            episode += 1
 
             self.history.add('gradient_count', gradient_count)
 
@@ -311,7 +314,7 @@ class HybridAgent:
         self.history.add('frames', self.total_frames)
 
         print(f"Training time: {training_time:.2f} seconds")
-        print(f"Training finished after {epoch} epochs")
+        print(f"Training finished after {episode} episodes")
         print(f"Total frames: {self.total_frames}")
         print(f"Elite gradient count: {len(elite[0].parameters)}")
         return self._make_net(elite[0])
