@@ -1,6 +1,7 @@
 import os
 import time
 import random
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -16,7 +17,7 @@ class DQNAgent:
         self.config = config
         self.env = env
         self.model = model.to(device)
-        self.replay_buffer = ReplayBuffer(config.replay_buffer_capacity, device)
+        self.replay_buffer = ReplayBuffer(config.replay_buffer_capacity, device, compress=True)
         self.optimizer = optimizer
         self.target_model = copy.deepcopy(self.model)
         self.target_model.load_state_dict(self.model.state_dict())
@@ -52,8 +53,8 @@ class DQNAgent:
     def save_history(self, path: str):
         self.history.save(path)
         self.history.summary(path, 
-                          plots=['frames_per_episode', 'reward_per_episode', 'time_per_episode', 'loss', 'memory_usage', 'replay_buffer_size'],
-                          additional_stats=['frames_last / total_time_last'])
+                          plots=['frames_per_episode', 'reward_per_episode', 'time_per_episode', 'loss', 'memory_usage', 'replay_buffer_size', 'epsilon'],
+                          additional_stats=['frames_last / total_time_last'], plot_compress=1000)
 
     def _action(self, state):
         if random.random() < self.epsilon:
@@ -63,8 +64,10 @@ class DQNAgent:
                 state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
                 return self.model(state).argmax().item()
             
+    # INFO: Eksponencjalne zmniejszanie epsilona
     def epsilon_update(self):
-        self.epsilon = max(self.config.epsilon_final, self.config.epsilon_start - self.total_frames / self.config.epsilon_decay)
+        # self.epsilon = max(self.config.epsilon_final, self.config.epsilon_start - self.total_frames / self.config.epsilon_decay)
+        self.epsilon = self.config.epsilon_final + (self.config.epsilon_start - self.config.epsilon_final) * np.exp(-self.total_frames / self.config.epsilon_decay)
 
     def train_step(self, state):
         self.total_frames += 1
@@ -100,18 +103,17 @@ class DQNAgent:
         while epoch < epochs:
             start_time_episode = time.time()
             state, _ = self.env.reset()
-            self.train_step(state)
 
             while not self.env.done:
                 epoch += 1
                 next_state = self.train_step(state)
-                progress_bar.set_postfix({'total_reward': self.env.total_reward, 'epsilon': self.epsilon})
-                progress_bar.update(1)
-
                 state = next_state
+                progress_bar.set_postfix({'Total reward': self.env.total_reward, 'Epsilon': self.epsilon, 'Episode': episode})
+                progress_bar.update(1)
 
             episode += 1
             end_time_episode = time.time()
+            self.history.add('epsilon', self.epsilon)
             self.history.add('frames_per_episode', self.env.frame_count)
             self.history.add('reward_per_episode', self.env.total_reward)
             self.history.add('time_per_episode', end_time_episode - start_time_episode)

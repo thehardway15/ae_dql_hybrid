@@ -35,7 +35,7 @@ class AEAgent:
         self.history.save(path)
         self.history.summary(path, 
                           plots=['frames_per_episode', 'reward_avg', 'reward_max', 'reward_std', 'speed'],
-                          additional_stats=['frames_last / total_time_last'])       
+                          additional_stats=['frames_last / total_time_last'])
 
     def _make_net(self, seeds: list[int], env: Environment = None):
         if env is None:
@@ -47,7 +47,7 @@ class AEAgent:
 
         for seed in seeds[1:]:
             net = self._mutate(net, seed, copy_net=True)
-                
+        
         return net
     
     def _mutate(self, net, seed, copy_net=False):
@@ -67,7 +67,7 @@ class AEAgent:
         net = net.to(self.device)
 
         while not env.done:
-            action = net(torch.FloatTensor(state).to(self.device)).argmax().item()
+            action = net(torch.FloatTensor(state).unsqueeze(0).to(self.device)).argmax().item()
             next_state, reward, _ = env.step(action)
             state = next_state
             episode_reward += reward
@@ -103,7 +103,7 @@ class AEAgent:
             cache = new_cache
 
     def train(self, epochs: int):
-        mp.set_start_method('forkserver')
+        mp.set_start_method('spawn', force=True)
         progress_bar = tqdm(range(epochs), desc="Training")
 
         SEEDS_PER_WORKER = self.config.population_size // self.config.worker_count
@@ -148,7 +148,7 @@ class AEAgent:
 
             speed = batch_step / (time.time() - epoch_start)
 
-            progress_bar.set_postfix({'AVG fitness': reward_avg, 'Max fitness': reward_max, 'Reward std': reward_std, 'Speed': speed})
+            progress_bar.set_postfix({'AVG fitness': reward_avg, 'Max fitness': reward_max, 'Episode': episode, 'Speed': speed})
             self.history.add('reward_avg', reward_avg)
             self.history.add('reward_max', reward_max)
             self.history.add('reward_std', reward_std)
@@ -183,8 +183,10 @@ class AEAgent:
             progress_bar.update(batch_step)
             episode += 1
 
+        for worker_queue in input_queues:
+            worker_queue.put(None)
+
         for worker in workers:
-            worker.terminate()
             worker.join()
 
         training_time = time.time() - t_start

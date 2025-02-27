@@ -12,6 +12,16 @@ def make_env(config, render='rgb_array'):
     terminal_on_life_loss = config.terminal_on_life_loss
 
     return Environment(env_name, atari_preprocessing, frame_stack, clip_rewards, terminal_on_life_loss, render)
+
+
+class FireOnResetWrapper(gym.Wrapper):
+    def __init__(self, env):
+        super().__init__(env)
+
+    def reset(self, **kwargs):
+        state, info = self.env.reset(**kwargs)
+        state, _, _, _, info = self.env.step(1)
+        return state, info
     
 
 class Environment:
@@ -19,9 +29,11 @@ class Environment:
                  clip_rewards=True, terminal_on_life_loss=False, render='rgb_array'):
         self.env = gym.make(env_name, render_mode=render)
         if atari_preprocessing:
-            self.env = gym.wrappers.AtariPreprocessing(self.env, grayscale_obs=True, scale_obs=False, frame_skip=4)
+            self.env = gym.wrappers.AtariPreprocessing(self.env, grayscale_obs=True, scale_obs=True, frame_skip=4)
+            self.env = FireOnResetWrapper(self.env)
         if frame_stack:
             self.env = gym.wrappers.FrameStackObservation(self.env, stack_size=4)
+        
         
         self.total_reward = 0
         self.done = False

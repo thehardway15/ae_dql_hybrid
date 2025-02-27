@@ -1,1 +1,1 @@
-from .dqn import DQNCartPole, DQNHuman
+from .dqn import DQNCartPole, DQNHuman, DQNDeepMind2013

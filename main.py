@@ -4,7 +4,7 @@ import torch
 import argparse
 from lib.agents.ae import AEAgent
 from lib.agents.hybrid import HybridAgent
-from lib.environ import Environment
+from lib.environ import Environment, make_env
 from lib.agents import DQNAgent
 import lib.config as config
 import lib.model as models
@@ -14,10 +14,10 @@ device = torch.device("mps" if torch.backends.mps.is_available() else ("cuda" if
 print(f"Using device: {device}")
 
 def train_gradient(args):
-    model_class = getattr(models, args.model_name)
     config_class = getattr(config, args.config)
+    model_class = getattr(models, config_class.model_name)
     
-    env = Environment(config_class.env_name)
+    env = make_env(config_class)
     model = model_class(env.observation_space.shape, env.action_space.n)
     optimizer = optim.Adam(model.parameters(), lr=config_class.learning_rate)
     agent = DQNAgent(config_class, env, model, device, optimizer, args.checkpoints, args.model_path)
@@ -29,8 +29,8 @@ def train_gradient(args):
 
                         
 def train_ae(args):
-    model_class = getattr(models, args.model_name)
     config_class = getattr(config, args.config)
+    model_class = getattr(models, config_class.model_name)
     epochs = args.epochs
 
     agent = AEAgent(config_class, model_class, device, args.checkpoints, args.model_path)
@@ -40,8 +40,8 @@ def train_ae(args):
                         
                         
 def train_hybrid(args):
-    model_class = getattr(models, args.model_name)
     config_class = getattr(config, args.config)
+    model_class = getattr(models, config_class.model_name)
     epochs = args.epochs
 
     agent = HybridAgent(config_class, model_class, device, args.checkpoints, args.model_path)
@@ -98,7 +98,6 @@ def main():
     parser.add_argument("--model_path", type=str, default="dqn_model.pt", help="Ścieżka zapisu/ładowania modelu")
     parser.add_argument("--version", type=str, default="gradient", help="Wersja treningu")
     parser.add_argument("--epochs", type=int, default=100_000, help="Liczba epok treningu")
-    parser.add_argument("--model_name", type=str, default="DQNCartPole", help="Nazwa modelu")
     parser.add_argument("--config", type=str, default="ConfigCartPole", help="Nazwa konfiguracji")
     parser.add_argument("--checkpoints", type=int, default=None, help="Liczba checkpointów")
     

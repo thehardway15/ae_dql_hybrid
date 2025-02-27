@@ -1,4 +1,5 @@
 import json
+import operator
 import os
 
 from matplotlib import pyplot as plt
@@ -30,10 +31,18 @@ class Metrics:
 
     def save(self, path: str):
         with open(os.path.join(path, 'metrics.json'), 'w') as f:
-            json.dump(self.store, f)
+            json.dump(self.store, f, indent=4)
 
-    def summary(self, path: str, plots=[], additional_stats=[]):
+    def summary(self, path: str, plots=[], additional_stats=[], plot_compress: int = None):
         summary = {}
+
+        ops = {
+            "+": operator.add,
+            "-": operator.sub,
+            "*": operator.mul,
+            "/": operator.truediv
+        }
+        
         for namespace in self.namespaces:
             stats = {}
             # variants: avg, max, min, std, last
@@ -46,22 +55,45 @@ class Metrics:
             
             for pattern in additional_stats:
                 key1, op, key2 = pattern.split(' ')
-                if key1 not in stats or key2 not in stats:
+                try:
+                    key1, op, key2 = pattern.split(' ')
+                    if key1 in stats and key2 in stats and op in ops:
+                        stats[f"{key1}_{op}_{key2}"] = ops[op](stats[key1], stats[key2])
+                except ValueError:
                     continue
-                stats[key1 + '_' + op + '_' + key2] = eval(f'{stats[key1]} {op} {stats[key2]}')
 
             for plot in plots:
                 if plot not in self.store[namespace]:
                     continue
-                plt.plot(self.store[namespace][plot])
-                plt.title(plot.replace('_', ' ').capitalize())
-                plt.xlabel('Episode')
-                plt.ylabel(plot.split('_')[0].capitalize())
-                plt.savefig(os.path.join(path, f'{plot}.png'))
-                plt.close()
+
+                values = self.store[namespace][plot]
+
+                if plot_compress and len(values) > plot_compress:
+                    compressed_avg = [np.mean(values[i:i + plot_compress]) for i in range(0, len(values), plot_compress)]
+                    plt.plot(range(len(compressed_avg)), compressed_avg, marker='o', linestyle='-')
+                    plt.xlabel(f'Episode (x{plot_compress})')
+                    plt.title(plot.replace('_', ' ').capitalize())
+                    plt.ylabel(plot.split('_')[0].capitalize())
+                    plt.savefig(os.path.join(path, f'{plot}_avg.png'))
+                    plt.close()
+
+                    compressed_max = [np.max(values[i:i + plot_compress]) for i in range(0, len(values), plot_compress)]
+                    plt.plot(range(len(compressed_max)), compressed_max, marker='o', linestyle='-')
+                    plt.xlabel(f'Episode (x{plot_compress})')
+                    plt.title(plot.replace('_', ' ').capitalize())
+                    plt.ylabel(plot.split('_')[0].capitalize())
+                    plt.savefig(os.path.join(path, f'{plot}_max.png'))
+                    plt.close()
+                else:
+                    plt.plot(values, linestyle='-')
+                    plt.xlabel('Episode')
+                    plt.title(plot.replace('_', ' ').capitalize())
+                    plt.ylabel(plot.split('_')[0].capitalize())
+                    plt.savefig(os.path.join(path, f'{plot}.png'))
+                    plt.close()
 
             summary[namespace] = stats
         
         with open(os.path.join(path, 'summary.json'), 'w') as f:
-            json.dump(summary, f)
+            json.dump(summary, f, indent=4)
 

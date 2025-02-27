@@ -7,3 +7,6 @@ torch
 torchvision
 pytorch-ignite
 ipdb
+lz4
+psutil
+stable-baselines3[extra]
