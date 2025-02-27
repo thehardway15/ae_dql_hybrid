@@ -8,3 +8,4 @@ logs
 *.png
 **/__pycache__/
 *_result/
+**/results/
