@@ -22,14 +22,16 @@ class DQN(nn.Module):
         super().__init__()
 
         self.network = nn.Sequential(
-            nn.Conv2d(4, 16, 8, stride=4),
+            nn.Conv2d(4, 32, kernel_size=8, stride=4),
             nn.ReLU(),
-            nn.Conv2d(16, 32, 4, stride=2),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(32 * 9 * 9, 256),
+            nn.Linear(3136, 512),
             nn.ReLU(),
-            nn.Linear(256, num_actions)
+            nn.Linear(512, num_actions)
         )
 
     def forward(self, x):
@@ -104,7 +106,7 @@ def deep_Q_learning(env, batch_size=32, M=30_000_000, epsilon_start=1, epsilon_e
                 plt.title('Average Reward on Breakout')
                 plt.xlabel('Training Epoch')
                 plt.ylabel('Average Reward per Episode')
-                plt.savefig('results/gradient_dqn/average_rewards_target_dqn.png')
+                plt.savefig('results/gradient_human/average_rewards_target_dqn.png')
                 plt.close()
 
             epoch += 1
@@ -118,35 +120,38 @@ def deep_Q_learning(env, batch_size=32, M=30_000_000, epsilon_start=1, epsilon_e
 
         if total_reward > max_reward:
             max_reward = total_reward
-            os.makedirs(f"results/gradient_dqn/models/{epoch}", exist_ok=True)
-            torch.save(q_network.state_dict(), f"results/gradient_dqn/models/{epoch}/target_q_network_{max_reward}.pt")
+            os.makedirs(f"results/gradient_human/models/{epoch}", exist_ok=True)
+            torch.save(q_network.state_dict(), f"results/gradient_human/models/{epoch}/target_q_network_{max_reward}.pt")
             
 
 if __name__ == "__main__":
-    os.makedirs('results/gradient_dqn/models', exist_ok=True)
-    os.makedirs('results/gradient_dqn/logs', exist_ok=True)
+    folder = 'gradient_human'
+    # os.makedirs(f'results/{folder}/models', exist_ok=True)
+    # os.makedirs(f'results/{folder}/logs', exist_ok=True)
 
-    env = gym.make('BreakoutNoFrameskip-v4')
-    env = gym.wrappers.ResizeObservation(env, (84, 84))
-    env = gym.wrappers.GrayscaleObservation(env)
-    env = gym.wrappers.FrameStackObservation(env, stack_size=4)
-    env = MaxAndSkipEnv(env, skip=4)
-    env = Monitor(env, f"results/gradient_dqn/logs/monitor.csv")
+    # env = gym.make('BreakoutNoFrameskip-v4')
+    # env = gym.wrappers.ResizeObservation(env, (84, 84))
+    # env = gym.wrappers.GrayscaleObservation(env)
+    # env = gym.wrappers.FrameStackObservation(env, stack_size=4)
+    # env = MaxAndSkipEnv(env, skip=4)
+    # env = Monitor(env, f"results/{folder}/logs/monitor.csv")
 
-    start_time = time.time()
-    deep_Q_learning(env, batch_size=32, M=20_000_000, epsilon_start=1, epsilon_end=0.01, nb_exploration_steps=1_000_000,
-                    buffer_size=1_000_000, gamma=0.99, training_start_it=80_000, update_frequency=4, device='cuda', C=10_000)
+    # start_time = time.time()
+    # deep_Q_learning(env, batch_size=32, M=50_000_000, epsilon_start=1, epsilon_end=0.01, nb_exploration_steps=1_000_000,
+    #                 buffer_size=1_000_000, gamma=0.99, training_start_it=80_000, update_frequency=4, device='cuda', C=10_000)
                 
-    end_time = time.time()
-    with open('results/gradient_dqn/logs/time.txt', 'w') as f:
-        f.write(f"Total time: {end_time - start_time} seconds")
+    # end_time = time.time()
+    # with open(f'results/{folder}/logs/time.txt', 'w') as f:
+    #     f.write(f"Total time: {end_time - start_time} seconds")
     
     # Wczytanie danych z pliku CSV
-    file_path = "results/gradient_dqn/logs/monitor.csv"
+    file_path = f"results/{folder}/logs/monitor.csv"
     df = pd.read_csv(file_path, skiprows=1)  # Pomija pierwszy wiersz z metadanymi
 
     # Ustawienie nazw kolumn
     df.columns = ["reward", "frames", "time"]
+    # grupowanie danych po 1000 epizodach
+    df = df.groupby(df.index // 1000).mean()
 
     # Wykres 1: Reward per Game (Postęp agenta)
     plt.figure(figsize=(10, 5))
@@ -156,7 +161,7 @@ if __name__ == "__main__":
     plt.title("Reward per Episode")
     plt.legend()
     plt.grid()
-    plt.savefig('results/gradient_dqn/reward_per_episode.png')
+    plt.savefig(f'results/{folder}/reward_per_episode.png')
 
     # Wykres 2: Frames per Game (Czas trwania epizodów)
     plt.figure(figsize=(10, 5))
@@ -166,7 +171,7 @@ if __name__ == "__main__":
     plt.title("Frames per Episode")
     plt.legend()
     plt.grid()
-    plt.savefig('results/gradient_dqn/frames_per_episode.png')
+    plt.savefig(f'results/{folder}/frames_per_episode.png')
 
     # Wykres 3: Reward vs Frames (Porównanie długości epizodu i nagrody)
     plt.figure(figsize=(10, 5))
@@ -176,7 +181,7 @@ if __name__ == "__main__":
     plt.title("Reward vs Frames")
     plt.legend()
     plt.grid()
-    plt.savefig('results/gradient_dqn/reward_vs_frames.png')
+    plt.savefig(f'results/{folder}/reward_vs_frames.png')
             
 
 
