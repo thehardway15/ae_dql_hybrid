@@ -5,13 +5,13 @@ import numpy as np
 import torch
 from stable_baselines3.common.atari_wrappers import MaxAndSkipEnv
 
-from gradient import DQN
+from gradient_human import DQN
 
 gym.register_envs(ale_py)
 
 
 def render(args):
-    env = gym.make('BreakoutNoFrameskip-v4', render_mode='human')
+    env = gym.make(args.game_name, render_mode='human')
     env = gym.wrappers.ResizeObservation(env, (84, 84))
     env = gym.wrappers.GrayscaleObservation(env)
     env = gym.wrappers.FrameStackObservation(env, stack_size=4)
@@ -60,8 +60,8 @@ def render(args):
 def main():
     parser = argparse.ArgumentParser(description="DQN Atari - Trening i Rendering")
     parser.add_argument("--model_path", type=str, default="dqn_model.pt", help="Ścieżka zapisu/ładowania modelu")
-    parser.add_argument("--env_name", type=str, default="BreakoutNoFrameskip-v4", help="Nazwa środowiska")
     parser.add_argument("--deterministic", type=bool, default=False, help="Czy używać deterministycznego działania")
+    parser.add_argument("--game_name", type=str, default="BreakoutNoFrameskip-v4", help="Nazwa gry")
     
     args = parser.parse_args()
     
